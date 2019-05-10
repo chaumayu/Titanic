@@ -29,6 +29,34 @@ def FillMissingValues(df):
 
     print df.isnull().any()
 
+def FeatureEngineering(df):
+    # PClass with Survived
+    print df[['Pclass', 'Survived']].groupby(['Pclass'], as_index=False).mean()
+
+    # Sec with Survived
+    print df[['Sex', 'Survived']].groupby(['Sex'], as_index=False).mean()
+
+    # SibSp + Parch (Sibling/Spouse + Parents/Childrens) = Family Size
+    df['FamilySize'] = df['SibSp'] + df['Parch'] + 1
+    print df[['FamilySize', 'Survived']].groupby(['FamilySize'], as_index=False).mean()
+
+    # Alone or not
+    df['IsAlone'] = 0
+    df.loc[df['FamilySize'] == 1, 'IsAlone'] = 1
+    print df[['IsAlone', 'Survived']].groupby(['IsAlone'], as_index=False).mean()
+
+    # Embarked
+    print df[['Embarked', 'Survived']].groupby(['Embarked'], as_index=False).mean()
+
+    # Age
+    Age_bins = [0,5,12,18,26,60,120]
+    Age_groups = ['Baby','Child','Teenager','Student','Adult','Senior']
+    df['AgeGroup'] = pd.cut(df.Age, Age_bins, labels = Age_groups)
+    print df['AgeGroup'].head(10)
+
+    # Fare
+    # Name
+
 def main():
     train_path = "Data/titanic/train.csv"
     test_path = "Data/titanic/test.csv"
@@ -37,6 +65,7 @@ def main():
 
     # Train.csv
     FillMissingValues(train)
+    FeatureEngineering(train)
 
 if __name__ == '__main__':
     main()
