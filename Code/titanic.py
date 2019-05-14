@@ -1,3 +1,4 @@
+import regex as re
 import pandas as pd
 
 def Read(train,test):
@@ -29,6 +30,8 @@ def FillMissingValues(df):
 
     print df.isnull().any()
 
+    return df
+
 def FeatureEngineering(df):
     # PClass with Survived
     print df[['Pclass', 'Survived']].groupby(['Pclass'], as_index=False).mean()
@@ -49,13 +52,42 @@ def FeatureEngineering(df):
     print df[['Embarked', 'Survived']].groupby(['Embarked'], as_index=False).mean()
 
     # Age
-    Age_bins = [0,5,12,18,26,60,120]
-    Age_groups = ['Baby','Child','Teenager','Student','Adult','Senior']
-    df['AgeGroup'] = pd.cut(df.Age, Age_bins, labels = Age_groups)
-    print df['AgeGroup'].head(10)
+    # age_bins = [0,5,12,18,26,60,120]
+    # age_groups = ['Baby','Child','Teenager','Student','Adult','Senior']
+    # df['AgeGroup'] = pd.cut(df.Age, age_bins, labels = age_groups)
+    # # print df['AgeGroup'].head(10)
+    # print df[['AgeGroup', 'Survived']].groupby(['AgeGroup'], as_index=False).mean()
+
+    df['CatAge'] = pd.cut(df['Age'], 5)
+    # print df['CatAge'].head()
+    print df[['CatAge', 'Survived']].groupby(['CatAge'], as_index=False).mean()
 
     # Fare
+    df['CatFare'] = pd.cut(df['Fare'], 4)
+    # print df['CatFare'].head()
+    print df[['CatFare', 'Survived']].groupby(['CatFare'], as_index=False).mean()
+
     # Name
+    def getTitle(name):
+        title_search = re.search(' ([A-Za-z]+)\.', name)
+    	# If the title exists, extract and return it.
+    	if title_search:
+    		return title_search.group(1)
+    	return ""
+
+    df['Title'] = df['Name'].apply(getTitle)
+
+    # print pd.crosstab(df['Title'], df['Sex'])
+
+    df['Title'] = df['Title'].replace(['Capt', 'Col', 'Countess', 'Don', 'Dr', 'Jonkheer', 'Lady',
+                                        'Major', 'Rev', 'Sir'], 'Rare')
+    df['Title'] = df['Title'].replace('Mlle', 'Miss')
+    df['Title'] = df['Title'].replace('Ms', 'Miss')
+    df['Title'] = df['Title'].replace('Mme', 'Mrs')
+
+    print df[['Title', 'Survived']].groupby(['Title'], as_index=False).mean()
+
+    return df
 
 def main():
     train_path = "Data/titanic/train.csv"
@@ -64,8 +96,8 @@ def main():
     train, test = Read(train_path, test_path)
 
     # Train.csv
-    FillMissingValues(train)
-    FeatureEngineering(train)
+    train = FillMissingValues(train)
+    train = FeatureEngineering(train)
 
 if __name__ == '__main__':
     main()
