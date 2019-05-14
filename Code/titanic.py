@@ -33,10 +33,14 @@ def FillMissingValues(df):
     return df
 
 def FeatureEngineering(df):
-    # PClass with Survived
+    # Cabin
+    df['HasCabin'] = df['Cabin'].apply(lambda x:0 if type(x) == float else 1)
+    print df[['HasCabin', 'Survived']].groupby(['HasCabin'], as_index=False).mean()
+
+    # PClass
     print df[['Pclass', 'Survived']].groupby(['Pclass'], as_index=False).mean()
 
-    # Sec with Survived
+    # Sec
     print df[['Sex', 'Survived']].groupby(['Sex'], as_index=False).mean()
 
     # SibSp + Parch (Sibling/Spouse + Parents/Childrens) = Family Size
@@ -87,6 +91,16 @@ def FeatureEngineering(df):
 
     print df[['Title', 'Survived']].groupby(['Title'], as_index=False).mean()
 
+    # df.to_csv('Results/feature-train.csv', index=False)
+
+    return df
+
+def DataCleaning(df):
+    drop_columns = ['PassengerId', 'Name', 'Age', 'SibSp', 'Parch', 'Ticket', 'Fare', 'Cabin']
+    df = df.drop(drop_columns, axis = 1)
+    # print df.head()
+    df.to_csv('Results/clean-train.csv', index=False)
+
     return df
 
 def main():
@@ -98,6 +112,7 @@ def main():
     # Train.csv
     train = FillMissingValues(train)
     train = FeatureEngineering(train)
+    train = DataCleaning(train)
 
 if __name__ == '__main__':
     main()
