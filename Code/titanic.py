@@ -32,7 +32,7 @@ def FillMissingValues(df):
 
     return df
 
-def FeatureEngineering(df):
+def TrainFeatureEngineering(df):
     # Cabin
     df['HasCabin'] = df['Cabin'].apply(lambda x:0 if type(x) == float else 1)
     print df[['HasCabin', 'Survived']].groupby(['HasCabin'], as_index=False).mean()
@@ -91,7 +91,42 @@ def FeatureEngineering(df):
 
     print df[['Title', 'Survived']].groupby(['Title'], as_index=False).mean()
 
-    # df.to_csv('Results/feature-train.csv', index=False)
+    return df
+
+def TestFeatureEngineering(df):
+    # Cabin
+    df['HasCabin'] = df['Cabin'].apply(lambda x:0 if type(x) == float else 1)
+
+    # SibSp + Parch (Sibling/Spouse + Parents/Childrens) = Family Size
+    df['FamilySize'] = df['SibSp'] + df['Parch'] + 1
+
+    # IsAlone on ship
+    df['IsAlone'] = 0
+    df.loc[df['FamilySize'] == 1, 'IsAlone'] = 1
+
+    # Age
+    df['CatAge'] = pd.cut(df['Age'], 5)
+
+    # Fare
+    df['CatFare'] = pd.cut(df['Fare'], 4)
+
+    # Name
+    def getTitle(name):
+        title_search = re.search(' ([A-Za-z]+)\.', name)
+    	# If the title exists, extract and return it.
+    	if title_search:
+    		return title_search.group(1)
+    	return ""
+
+    df['Title'] = df['Name'].apply(getTitle)
+
+    # print pd.crosstab(df['Title'], df['Sex'])
+
+    df['Title'] = df['Title'].replace(['Capt', 'Col', 'Countess', 'Don', 'Dr', 'Jonkheer', 'Lady',
+                                        'Major', 'Rev', 'Sir'], 'Rare')
+    df['Title'] = df['Title'].replace('Mlle', 'Miss')
+    df['Title'] = df['Title'].replace('Ms', 'Miss')
+    df['Title'] = df['Title'].replace('Mme', 'Mrs')
 
     return df
 
@@ -99,7 +134,13 @@ def DataCleaning(df):
     drop_columns = ['PassengerId', 'Name', 'Age', 'SibSp', 'Parch', 'Ticket', 'Fare', 'Cabin']
     df = df.drop(drop_columns, axis = 1)
     # print df.head()
-    df.to_csv('Results/clean-train.csv', index=False)
+
+    return df
+
+def OneHotEncoding(df):
+    df = pd.get_dummies(df, columns=['Pclass','Sex','Embarked','HasCabin','FamilySize','IsAlone',
+                                        'CatAge','CatFare','Title'])
+    # print df.head()
 
     return df
 
@@ -111,8 +152,19 @@ def main():
 
     # Train.csv
     train = FillMissingValues(train)
-    train = FeatureEngineering(train)
+    train = TrainFeatureEngineering(train)
     train = DataCleaning(train)
+    train = OneHotEncoding(train)
+
+    train.to_csv('Results/train-processed.csv', index=False)
+
+    test = FillMissingValues(test)
+    test = TestFeatureEngineering(test)
+    test = DataCleaning(test)
+    test = OneHotEncoding(test)
+
+    test.to_csv('Results/test-processed.csv', index=False)
+
 
 if __name__ == '__main__':
     main()
