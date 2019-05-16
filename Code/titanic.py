@@ -1,6 +1,17 @@
 import regex as re
 import pandas as pd
 
+import lightgbm as lgb
+
+from xgboost import XGBClassifier
+
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+
+from sklearn.model_selection import GridSearchCV
+
 def Read(train,test):
     train = pd.read_csv(train)
     test = pd.read_csv(test)
@@ -56,20 +67,28 @@ def TrainFeatureEngineering(df):
     print df[['Embarked', 'Survived']].groupby(['Embarked'], as_index=False).mean()
 
     # Age
-    # age_bins = [0,5,12,18,26,60,120]
-    # age_groups = ['Baby','Child','Teenager','Student','Adult','Senior']
-    # df['AgeGroup'] = pd.cut(df.Age, age_bins, labels = age_groups)
-    # # print df['AgeGroup'].head(10)
-    # print df[['AgeGroup', 'Survived']].groupby(['AgeGroup'], as_index=False).mean()
+    # df['CatAge'] = pd.cut(df['Age'], 5)
+    # # print df['CatAge'].head()
+    # print df[['CatAge', 'Survived']].groupby(['CatAge'], as_index=False).mean()
 
-    df['CatAge'] = pd.cut(df['Age'], 5)
-    # print df['CatAge'].head()
-    print df[['CatAge', 'Survived']].groupby(['CatAge'], as_index=False).mean()
+    age_bins = [0,5,12,18,26,64,120]
+    age_groups = ['Baby','Child','Teenager','Student','Adult','Senior']
+    df['AgeGroup'] = pd.cut(df.Age, age_bins, labels = age_groups)
+    # print df['AgeGroup'].head(10)
+    print df[['AgeGroup', 'Survived']].groupby(['AgeGroup'], as_index=False).mean()
 
     # Fare
-    df['CatFare'] = pd.cut(df['Fare'], 4)
-    # print df['CatFare'].head()
-    print df[['CatFare', 'Survived']].groupby(['CatFare'], as_index=False).mean()
+    # # print df['Fare'].min()
+    # df['CatFare'] = pd.cut(df['Fare'], 4)
+    # # print df['CatFare'].head()
+    # print df[['CatFare', 'Survived']].groupby(['CatFare'], as_index=False).mean()
+
+    fare_bins = [0,130,260,380,520]
+    fare_groups = ['Low','Med','High','Very_High']
+    df['FareGroup'] = pd.cut(df.Fare, fare_bins, labels = fare_groups)
+    # print df['FareGroup'].head(10)
+    print df[['FareGroup', 'Survived']].groupby(['FareGroup'], as_index=False).mean()
+
 
     # Name
     def getTitle(name):
@@ -105,10 +124,16 @@ def TestFeatureEngineering(df):
     df.loc[df['FamilySize'] == 1, 'IsAlone'] = 1
 
     # Age
-    df['CatAge'] = pd.cut(df['Age'], 5)
+    age_bins = [0,5,12,18,26,64,120]
+    age_groups = ['Baby','Child','Teenager','Student','Adult','Senior']
+    df['AgeGroup'] = pd.cut(df.Age, age_bins, labels = age_groups)
+    # print df['AgeGroup'].head(10)
 
     # Fare
-    df['CatFare'] = pd.cut(df['Fare'], 4)
+    fare_bins = [0,130,260,380,520]
+    fare_groups = ['Low','Med','High','Very_High']
+    df['FareGroup'] = pd.cut(df.Fare, fare_bins, labels = fare_groups)
+    # print df['FareGroup'].head(10)
 
     # Name
     def getTitle(name):
@@ -127,6 +152,7 @@ def TestFeatureEngineering(df):
     df['Title'] = df['Title'].replace('Mlle', 'Miss')
     df['Title'] = df['Title'].replace('Ms', 'Miss')
     df['Title'] = df['Title'].replace('Mme', 'Mrs')
+    df['Title'] = df['Title'].replace('Dona', 'Mrs')
 
     return df
 
@@ -139,10 +165,80 @@ def DataCleaning(df):
 
 def OneHotEncoding(df):
     df = pd.get_dummies(df, columns=['Pclass','Sex','Embarked','HasCabin','FamilySize','IsAlone',
-                                        'CatAge','CatFare','Title'])
+                                        'AgeGroup','FareGroup','Title'])
     # print df.head()
 
     return df
+
+def FeatureLabel(train):
+    X_train = train.drop(['Survived'], axis=1)
+    y_train = train['Survived']
+
+    return X_train, y_train
+
+def SupportVectorMachine(X_train, y_train, X_test):
+    parameters = {  'kernel':('linear', 'rbf'),
+                    'C':[0.025, 0.05, 0.1, 1, 10],
+                    'gamma':[0.001, 0.01, 0.1, 1]}
+    svc = SVC(random_state=0)
+    clf = GridSearchCV(svc, parameters, cv=5, n_jobs=-1)
+    clf.fit(X_train, y_train)
+    print clf.best_params_
+    # {'kernel': 'linear', 'C': 1, 'gamma': 0.001}
+    SVC_predict = clf.predict(X_test)
+
+    return SVC_predict
+
+def RandomForest(X_train, y_train, X_test):
+    clf = RandomForestClassifier(n_estimators=100, max_depth=2, random_state=0)
+    clf.fit(X_train, y_train)
+    RF_predict = clf.predict(X_test)
+
+    # print clf.feature_importances_
+
+    return RF_predict
+
+def XGBoost(X_train, y_train, X_test):
+    clf = XGBClassifier(learning_rate=0.1, n_estimators=100, n_jobs=-1)
+    clf.fit(X_train, y_train)
+    XGB_predict = clf.predict(X_test)
+
+    # print clf.feature_importances_
+
+    return XGB_predict
+
+def DecisionTree(X_train, y_train, X_test):
+    clf = DecisionTreeClassifier(random_state=0)
+    clf.fit(X_train, y_train)
+    DT_predict = clf.predict(X_test)
+
+    # print clf.feature_importances_
+
+    return DT_predict
+
+def GradientBoosting(X_train, y_train, X_test):
+    clf = GradientBoostingClassifier(random_state=0)
+    clf.fit(X_train, y_train)
+    GB_predict = clf.predict(X_test)
+
+    # print clf.feature_importances_
+
+    return GB_predict
+
+def LightGBM(X_train, y_train, X_test):
+    train_data = lgb.Dataset(X_train, label=y_train)
+
+    params = {
+         'random_state': 0,
+         'num_threads': 4,
+         'objective': 'binary'
+         }
+
+    lgb_model = lgb.train(params, train_data)
+
+    LGB_predict = lgb_model.predict(X_test, num_iteration=lgb_model.best_iteration)
+
+    return LGB_predict
 
 def main():
     train_path = "Data/titanic/train.csv"
@@ -151,20 +247,37 @@ def main():
     train, test = Read(train_path, test_path)
 
     # Train.csv
-    train = FillMissingValues(train)
-    train = TrainFeatureEngineering(train)
-    train = DataCleaning(train)
-    train = OneHotEncoding(train)
+    train_fillna = FillMissingValues(train)
+    train_feature = TrainFeatureEngineering(train_fillna)
+    train_clean = DataCleaning(train_feature)
+    train_ohe = OneHotEncoding(train_clean)
+    X_train, y_train = FeatureLabel(train_ohe)
+    # print X_train.info()
 
-    train.to_csv('Results/train-processed.csv', index=False)
+    # train.to_csv('Results/train-processed.csv', index=False)
 
-    test = FillMissingValues(test)
-    test = TestFeatureEngineering(test)
-    test = DataCleaning(test)
-    test = OneHotEncoding(test)
+    test_fillna = FillMissingValues(test)
+    test_feature = TestFeatureEngineering(test_fillna)
+    test_clean = DataCleaning(test_feature)
+    X_test = OneHotEncoding(test_clean)
+    # print X_test.info()
 
-    test.to_csv('Results/test-processed.csv', index=False)
+    # X_test.to_csv('Results/test-processed.csv', index=False)
 
+    # SVC_predict = SupportVectorMachine(X_train, y_train, X_test)
+
+    # RF_predict = RandomForest(X_train, y_train, X_test)
+
+    # XGB_predict = XGBoost(X_train, y_train, X_test)
+
+    # DT_predict = DecisionTree(X_train, y_train, X_test)
+
+    # GB_predict = GradientBoosting(X_train, y_train, X_test)
+
+    LGB_predict = LightGBM(X_train, y_train, X_test)
+
+    submission_svm = pd.DataFrame({"PassengerId": test_feature['PassengerId'], "Survived": LGB_predict})
+    submission_svm.to_csv('Results/submission_lgb.csv', index=False)
 
 if __name__ == '__main__':
     main()
