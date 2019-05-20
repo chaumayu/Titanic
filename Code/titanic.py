@@ -229,9 +229,10 @@ def LightGBM(X_train, y_train, X_test):
     train_data = lgb.Dataset(X_train, label=y_train)
 
     params = {
+         'objective': 'binary',
          'random_state': 0,
+         'boost_from_average':False,
          'num_threads': 4,
-         'objective': 'binary'
          }
 
     lgb_model = lgb.train(params, train_data)
@@ -276,8 +277,8 @@ def main():
 
     LGB_predict = LightGBM(X_train, y_train, X_test)
 
-    submission_svm = pd.DataFrame({"PassengerId": test_feature['PassengerId'], "Survived": LGB_predict})
-    submission_svm.to_csv('Results/submission_lgb.csv', index=False)
+    # submission_svm = pd.DataFrame({"PassengerId": test_feature['PassengerId'], "Survived": LGB_predict})
+    # submission_svm.to_csv('Results/submission_lgb.csv', index=False)
 
 if __name__ == '__main__':
     main()
