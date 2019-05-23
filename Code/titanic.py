@@ -1,5 +1,9 @@
 import regex as re
 import pandas as pd
+import matplotlib.pyplot as plt
+
+
+from sklearn.preprocessing import StandardScaler
 
 import lightgbm as lgb
 
@@ -145,6 +149,8 @@ def TestFeatureEngineering(df):
 
     df['Title'] = df['Name'].apply(getTitle)
 
+    # df['Title'] = df['Name'].str.extract('([A-Za-z]+)\.', expand=False)
+
     # print pd.crosstab(df['Title'], df['Sex'])
 
     df['Title'] = df['Title'].replace(['Capt', 'Col', 'Countess', 'Don', 'Dr', 'Jonkheer', 'Lady',
@@ -176,15 +182,27 @@ def FeatureLabel(train):
 
     return X_train, y_train
 
+# def DataScaling(X_train, X_test):
+#     sc = StandardScaler()
+#     # sc = RobustScaler()
+#     sc.fit(X_train)
+#     X_train_scaled = sc.transform(X_train)
+#     X_train_scaled = pd.DataFrame(X_train_scaled, columns=X_train.columns)
+#
+#     X_test_scaled = sc.transform(X_test)
+#     X_test_scaled = pd.DataFrame(X_test_scaled, columns=X_test.columns)
+#
+#     return X_train_scaled, X_test_scaled
+
 def SupportVectorMachine(X_train, y_train, X_test):
     parameters = {  'kernel':('linear', 'rbf'),
-                    'C':[0.025, 0.05, 0.1, 1, 10],
-                    'gamma':[0.001, 0.01, 0.1, 1]}
+                    'C':[1], # 0.005, 0.01, 0.025, 0.05, 0.1, 1, 5
+                    'gamma':[0.01]} # 0.001, 0.01, 0.1
     svc = SVC(random_state=0)
     clf = GridSearchCV(svc, parameters, cv=5, n_jobs=-1)
     clf.fit(X_train, y_train)
     print clf.best_params_
-    # {'kernel': 'linear', 'C': 1, 'gamma': 0.001}
+    # {'kernel': 'linear', 'C': 1, 'gamma': 0.01}
     SVC_predict = clf.predict(X_test)
 
     return SVC_predict
@@ -199,11 +217,25 @@ def RandomForest(X_train, y_train, X_test):
     return RF_predict
 
 def XGBoost(X_train, y_train, X_test):
-    clf = XGBClassifier(learning_rate=0.1, n_estimators=100, n_jobs=-1)
+    parameters = {'gamma':[1], #0.5, 1, 1.5,
+                'max_depth':[2], #2, 4, 6
+                'min_child_weight':[1],# 1, 2, 5, 10
+                'colsample_bytree': [0.4], # 0.6, 0.8, 1.0
+                'subsample': [0.6], # 0.6, 0.8, 1
+                'objective':['binary:logistic']}
+    xgb = XGBClassifier(learning_rate=0.1, n_estimators=1000, nthread=4, random_state=0)
+    clf = GridSearchCV(xgb, parameters, cv=5, n_jobs=-1)
     clf.fit(X_train, y_train)
+    print clf.best_params_
+    # {'colsample_bytree': 0.4, 'min_child_weight': 1, 'subsample': 0.6,
+    #             'objective': 'binary:logistic', 'max_depth': 2, 'gamma': 1}
+
     XGB_predict = clf.predict(X_test)
 
     # print clf.feature_importances_
+    # feat_importances = pd.Series(clf.feature_importances_, index=X_train.columns)
+    # feat_importances.nlargest(10).plot(kind='barh')
+    # plt.show()
 
     return XGB_predict
 
@@ -255,7 +287,7 @@ def main():
     X_train, y_train = FeatureLabel(train_ohe)
     # print X_train.info()
 
-    # train.to_csv('Results/train-processed.csv', index=False)
+    # X_train.to_csv('Results/train-processed.csv', index=False)
 
     test_fillna = FillMissingValues(test)
     test_feature = TestFeatureEngineering(test_fillna)
@@ -265,20 +297,22 @@ def main():
 
     # X_test.to_csv('Results/test-processed.csv', index=False)
 
+    # X_train_scaled, X_test_scaled = DataScaling(X_train, X_test)
+
     # SVC_predict = SupportVectorMachine(X_train, y_train, X_test)
 
     # RF_predict = RandomForest(X_train, y_train, X_test)
 
-    # XGB_predict = XGBoost(X_train, y_train, X_test)
+    XGB_predict = XGBoost(X_train, y_train, X_test)
 
     # DT_predict = DecisionTree(X_train, y_train, X_test)
 
     # GB_predict = GradientBoosting(X_train, y_train, X_test)
 
-    LGB_predict = LightGBM(X_train, y_train, X_test)
+    # LGB_predict = LightGBM(X_train, y_train, X_test)
 
-    # submission_svm = pd.DataFrame({"PassengerId": test_feature['PassengerId'], "Survived": LGB_predict})
-    # submission_svm.to_csv('Results/submission_lgb.csv', index=False)
+    submission = pd.DataFrame({"PassengerId": test_feature['PassengerId'], "Survived": XGB_predict})
+    submission.to_csv('Results/submission_xgb4.csv', index=False)
 
 if __name__ == '__main__':
     main()
