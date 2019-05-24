@@ -30,7 +30,7 @@ def Read(train,test):
 
 def FillMissingValues(df):
     # Check for missing values
-    print df.isnull().any()
+    print df.isnull().sum()
 
     # Embarked feature has some missing values and fill most occurred value ('S').
     print df['Embarked'].value_counts()
@@ -42,7 +42,12 @@ def FillMissingValues(df):
     # print age_mean
     df['Age'] = df['Age'].fillna(age_mean)
 
-    print df.isnull().any()
+    # Fare feature has some missing claues and fill mean of fare
+    fare_mean = int(df['Fare'].mean())
+    # print fare_mean
+    df['Fare'] = df['Fare'].fillna(fare_mean)
+
+    print df.isnull().sum()
 
     return df
 
@@ -86,11 +91,11 @@ def TrainFeatureEngineering(df):
     # # print df['CatFare'].head()
     # print df[['CatFare', 'Survived']].groupby(['CatFare'], as_index=False).mean()
 
-    # fare_bins = [0,130,260,380,520]
-    # fare_groups = ['Low','Med','High','Very_High']
-    # df['FareGroup'] = pd.cut(df.Fare, fare_bins, labels = fare_groups)
-    # # print df['FareGroup'].head(10)
-    # print df[['FareGroup', 'Survived']].groupby(['FareGroup'], as_index=False).mean()
+    fare_bins = [0,130,260,380,520]
+    fare_groups = ['Low','Med','High','Very_High']
+    df['FareGroup'] = pd.cut(df.Fare, fare_bins, labels = fare_groups)
+    # print df['FareGroup'].head(10)
+    print df[['FareGroup', 'Survived']].groupby(['FareGroup'], as_index=False).mean()
 
 
     # Name
@@ -133,9 +138,9 @@ def TestFeatureEngineering(df):
     # print df['AgeGroup'].head(10)
 
     # Fare
-    # fare_bins = [0,130,260,380,520]
-    # fare_groups = ['Low','Med','High','Very_High']
-    # df['FareGroup'] = pd.cut(df.Fare, fare_bins, labels = fare_groups)
+    fare_bins = [0,130,260,380,520]
+    fare_groups = ['Low','Med','High','Very_High']
+    df['FareGroup'] = pd.cut(df.Fare, fare_bins, labels = fare_groups)
     # print df['FareGroup'].head(10)
 
     # Name
@@ -162,7 +167,7 @@ def TestFeatureEngineering(df):
     return df
 
 def DataCleaning(df):
-    drop_columns = ['PassengerId', 'Name', 'Age', 'SibSp', 'Parch', 'Ticket', 'Cabin']
+    drop_columns = ['PassengerId', 'Name', 'Age', 'SibSp', 'Parch', 'Ticket', 'Cabin', 'Fare']
     df = df.drop(drop_columns, axis = 1)
     # print df.head()
 
@@ -170,7 +175,7 @@ def DataCleaning(df):
 
 def OneHotEncoding(df):
     df = pd.get_dummies(df, columns=['Pclass','Sex','Embarked','HasCabin','FamilySize','IsAlone',
-                                        'AgeGroup','Title'])
+                                        'AgeGroup','FareGroup','Title'])
     # print df.head()
 
     return df
@@ -181,24 +186,25 @@ def FeatureLabel(train):
 
     return X_train, y_train
 
-def DataScaling(X_train, X_test):
-    sc = StandardScaler()
-    # sc = RobustScaler()
-    X_train['Fare'] = sc.fit_transform(X_train[['Fare']])
-    # sc.fit(X_train)
-    # X_train_scaled = sc.transform(X_train)
-    # X_train_scaled = pd.DataFrame(X_train_scaled, columns=X_train.columns)
-
-    X_test['Fare'] = sc.fit_transform(X_test[['Fare']])
-    # X_test_scaled = sc.transform(X_test)
-    # X_test_scaled = pd.DataFrame(X_test_scaled, columns=X_test.columns)
-
-    return X_train, X_test
+# def DataScaling(X_train, X_test):
+#     sc = StandardScaler()
+#     # sc = RobustScaler()
+#     X_train['Fare'] = sc.fit_transform(X_train[['Fare']])
+#     # sc.fit(X_train)
+#     # X_train_scaled = sc.transform(X_train)
+#     # X_train_scaled = pd.DataFrame(X_train_scaled, columns=X_train.columns)
+#
+#     X_test['Fare'] = sc.fit_transform(X_test[['Fare']])
+#     # X_test_scaled = sc.transform(X_test)
+#     # X_test_scaled = pd.DataFrame(X_test_scaled, columns=X_test.columns)
+#
+#     return X_train, X_test
 
 def SupportVectorMachine(X_train, y_train, X_valid, y_valid):
-    parameters = {  'kernel':('linear', 'rbf'),
+    parameters = {  'kernel':('linear', 'rbf', 'poly'),
                     'C':[0.005, 0.01, 0.025, 0.05, 0.1, 1, 5],
-                    'gamma':[0.001, 0.01, 0.1]}
+                    'gamma':[0.001, 0.01, 0.1],
+                    'degree':[3]}
     svc = SVC(random_state=0)
     clf = GridSearchCV(svc, parameters, cv=5, n_jobs=-1)
     clf.fit(X_train, y_train)
@@ -209,10 +215,24 @@ def SupportVectorMachine(X_train, y_train, X_valid, y_valid):
     print 'Accuracy Score for SVM:-', acc_score
     # 0.8271186440677966
 
-def RandomForest(X_train, y_train, X_test):
-    clf = RandomForestClassifier(n_estimators=100, max_depth=2, random_state=0)
+def RandomForest(X_train, y_train, X_valid, y_valid):
+    parameters = {'max_depth'   : [4],#2, 4, 6
+                    'max_features': [10],#8, 10, 12
+                    "min_samples_split": [6]}#4, 6, 8
+    rf = RandomForestClassifier(n_estimators=1000, n_jobs=-1, random_state=0)
+    clf = GridSearchCV(rf, parameters, cv=5, n_jobs=-1)
     clf.fit(X_train, y_train)
-    RF_predict = clf.predict(X_test)
+    print clf.best_params_
+    # {'max_features': 8, 'min_samples_split': 4, 'n_estimators': 300, 'max_depth': 4}
+    # {'max_features': 8, 'min_samples_split': 2, 'max_depth': 4}
+    # {'max_features': 10, 'min_samples_split': 6, 'max_depth': 4}
+
+    RF_predict = clf.predict(X_valid)
+    acc_score = metrics.accuracy_score(RF_predict,y_valid)
+    print 'Accuracy Score for RF:-', acc_score
+    # 0.8033898305084746
+    # 500 - 0.8067796610169492
+    # 1000 - 0.8169491525423729
 
     # print clf.feature_importances_
 
@@ -259,30 +279,25 @@ def DecisionTree(X_train, y_train, X_test):
 
     return DT_predict
 
-def GradientBoosting(X_train, y_train, X_test):
-    clf = GradientBoostingClassifier(random_state=0)
+def GradientBoosting(X_train, y_train, X_valid, y_valid):
+    parameters = {'loss' : ["deviance","exponential"],
+                    'max_depth':  [4],# 3, 4, 5
+                    'max_features': [3], # 2, 3, 4
+                    'min_samples_leaf': [5]} # 4, 5, 6
+    gb = GradientBoostingClassifier(n_estimators = 300, learning_rate=0.01, random_state=0)
+    clf = GridSearchCV(gb, parameters, cv=5, n_jobs=-1)
     clf.fit(X_train, y_train)
-    GB_predict = clf.predict(X_test)
+    print clf.best_params_
+    # {'max_features': 3, 'loss': 'deviance', 'max_depth': 4, 'min_samples_leaf': 5}
+
+    GB_predict = clf.predict(X_valid)
+    acc_score = metrics.accuracy_score(GB_predict,y_valid)
+    print 'Accuracy Score for GB:-', acc_score
+    # 0.8372881355932204
 
     # print clf.feature_importances_
 
     return GB_predict
-
-def LightGBM(X_train, y_train, X_test):
-    train_data = lgb.Dataset(X_train, label=y_train)
-
-    params = {
-         'objective': 'binary',
-         'random_state': 0,
-         'boost_from_average':False,
-         'num_threads': 4,
-         }
-
-    lgb_model = lgb.train(params, train_data)
-
-    LGB_predict = lgb_model.predict(X_test, num_iteration=lgb_model.best_iteration)
-
-    return LGB_predict
 
 def main():
     train_path = "Data/titanic/train.csv"
@@ -304,24 +319,22 @@ def main():
     X_test = OneHotEncoding(test_clean)
     # print X_test.info()
 
-    X_train, X_test = DataScaling(X_train, X_test)
+    # X_train, X_test = DataScaling(X_train, X_test)
     # X_train.to_csv('Results/train-processed.csv', index=False)
     # X_test.to_csv('Results/test-processed.csv', index=False)
 
     X_train, X_valid, y_train, y_valid = train_test_split(X_train, y_train,
                                                             test_size=0.33, random_state=0)
 
-    SVC_predict = SupportVectorMachine(X_train, y_train, X_valid, y_valid)
+    # SVC_predict = SupportVectorMachine(X_train, y_train, X_valid, y_valid)
 
-    # RF_predict = RandomForest(X_train, y_train, X_test)
+    # RF_predict = RandomForest(X_train, y_train, X_valid, y_valid)
 
     # XGB_predict = XGBoost(X_train, y_train, X_valid, y_valid)
 
     # DT_predict = DecisionTree(X_train, y_train, X_test)
 
-    # GB_predict = GradientBoosting(X_train, y_train, X_test)
-
-    # LGB_predict = LightGBM(X_train, y_train, X_test)
+    GB_predict = GradientBoosting(X_train, y_train, X_valid, y_valid)
 
     # submission = pd.DataFrame({"PassengerId": test_feature['PassengerId'], "Survived": XGB_predict})
     # submission.to_csv('Results/submission_xgb3.csv', index=False)
