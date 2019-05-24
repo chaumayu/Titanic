@@ -12,7 +12,7 @@ from xgboost import XGBClassifier
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, VotingClassifier
 
 from sklearn.model_selection import GridSearchCV
 
@@ -21,7 +21,10 @@ def Read(train,test):
     test = pd.read_csv(test)
 
     print train.head()
+    print '-'*20, '\n'
+
     print train.info()
+    print '-'*20, '\n'
 
     # # Drop unique features values
     # train.drop(['Name', 'Ticket', 'Cabin'], axis=1)
@@ -31,10 +34,12 @@ def Read(train,test):
 
 def FillMissingValues(df):
     # Check for missing values
-    print df.isnull().any()
+    # print df.isnull().any()
+    print df.isnull().sum()
+    print '-'*20, '\n'
 
     # Embarked feature has some missing values and fill most occurred value ('S').
-    print df['Embarked'].value_counts()
+    # print df['Embarked'].value_counts()
     embarked = df['Embarked'].value_counts().index[0]
     df['Embarked'] = df['Embarked'].fillna(embarked)
 
@@ -43,7 +48,14 @@ def FillMissingValues(df):
     # print age_mean
     df['Age'] = df['Age'].fillna(age_mean)
 
-    print df.isnull().any()
+    # Fare feature has some missing claues and fill mean of fare
+    fare_mean = int(df['Fare'].mean())
+    # print fare_mean
+    df['Fare'] = df['Fare'].fillna(fare_mean)
+
+    # print df.isnull().any()
+    print df.isnull().sum()
+    print '-'*20, '\n'
 
     return df
 
@@ -51,24 +63,30 @@ def TrainFeatureEngineering(df):
     # Cabin
     df['HasCabin'] = df['Cabin'].apply(lambda x:0 if type(x) == float else 1)
     print df[['HasCabin', 'Survived']].groupby(['HasCabin'], as_index=False).mean()
+    print '-'*20, '\n'
 
     # PClass
     print df[['Pclass', 'Survived']].groupby(['Pclass'], as_index=False).mean()
+    print '-'*20, '\n'
 
     # Sec
     print df[['Sex', 'Survived']].groupby(['Sex'], as_index=False).mean()
+    print '-'*20, '\n'
 
     # SibSp + Parch (Sibling/Spouse + Parents/Childrens) = Family Size
     df['FamilySize'] = df['SibSp'] + df['Parch'] + 1
     print df[['FamilySize', 'Survived']].groupby(['FamilySize'], as_index=False).mean()
+    print '-'*20, '\n'
 
     # Alone or not
     df['IsAlone'] = 0
     df.loc[df['FamilySize'] == 1, 'IsAlone'] = 1
     print df[['IsAlone', 'Survived']].groupby(['IsAlone'], as_index=False).mean()
+    print '-'*20, '\n'
 
     # Embarked
     print df[['Embarked', 'Survived']].groupby(['Embarked'], as_index=False).mean()
+    print '-'*20, '\n'
 
     # Age
     # df['CatAge'] = pd.cut(df['Age'], 5)
@@ -80,6 +98,7 @@ def TrainFeatureEngineering(df):
     df['AgeGroup'] = pd.cut(df.Age, age_bins, labels = age_groups)
     # print df['AgeGroup'].head(10)
     print df[['AgeGroup', 'Survived']].groupby(['AgeGroup'], as_index=False).mean()
+    print '-'*20, '\n'
 
     # Fare
     # # print df['Fare'].min()
@@ -92,6 +111,7 @@ def TrainFeatureEngineering(df):
     df['FareGroup'] = pd.cut(df.Fare, fare_bins, labels = fare_groups)
     # print df['FareGroup'].head(10)
     print df[['FareGroup', 'Survived']].groupby(['FareGroup'], as_index=False).mean()
+    print '-'*20, '\n'
 
 
     # Name
@@ -113,6 +133,7 @@ def TrainFeatureEngineering(df):
     df['Title'] = df['Title'].replace('Mme', 'Mrs')
 
     print df[['Title', 'Survived']].groupby(['Title'], as_index=False).mean()
+    print '-'*20, '\n'
 
     return df
 
@@ -205,16 +226,25 @@ def SupportVectorMachine(X_train, y_train, X_test):
     # {'kernel': 'linear', 'C': 1, 'gamma': 0.01}
     SVC_predict = clf.predict(X_test)
 
-    return SVC_predict
+    return SVC_predict, clf
 
 def RandomForest(X_train, y_train, X_test):
-    clf = RandomForestClassifier(n_estimators=100, max_depth=2, random_state=0)
+    parameters = {'max_depth'   : [4],#2, 4, 6
+                    'max_features': [10],#8, 10, 12
+                    "min_samples_split": [6]}#4, 6, 8
+    rf = RandomForestClassifier(n_estimators=1000, n_jobs=-1, random_state=0)
+    clf = GridSearchCV(rf, parameters, cv=5, n_jobs=-1)
     clf.fit(X_train, y_train)
+    print clf.best_params_
+    # {'max_features': 8, 'min_samples_split': 4, 'n_estimators': 300, 'max_depth': 4}
+    # {'max_features': 8, 'min_samples_split': 2, 'max_depth': 4}
+    # {'max_features': 10, 'min_samples_split': 6, 'max_depth': 4}
+
     RF_predict = clf.predict(X_test)
 
     # print clf.feature_importances_
 
-    return RF_predict
+    return RF_predict, clf
 
 def XGBoost(X_train, y_train, X_test):
     parameters = {'gamma':[1], #0.5, 1, 1.5,
@@ -237,7 +267,7 @@ def XGBoost(X_train, y_train, X_test):
     # feat_importances.nlargest(10).plot(kind='barh')
     # plt.show()
 
-    return XGB_predict
+    return XGB_predict, clf
 
 def DecisionTree(X_train, y_train, X_test):
     clf = DecisionTreeClassifier(random_state=0)
@@ -249,29 +279,32 @@ def DecisionTree(X_train, y_train, X_test):
     return DT_predict
 
 def GradientBoosting(X_train, y_train, X_test):
-    clf = GradientBoostingClassifier(random_state=0)
+    parameters = {'loss' : ["deviance","exponential"],
+                    'max_depth':  [4],# 3, 4, 5
+                    'max_features': [3], # 2, 3, 4
+                    'min_samples_leaf': [5]} # 4, 5, 6
+    gb = GradientBoostingClassifier(n_estimators = 300, learning_rate=0.01, random_state=0)
+    clf = GridSearchCV(gb, parameters, cv=5, n_jobs=-1)
     clf.fit(X_train, y_train)
+    print clf.best_params_
+    # {'max_features': 3, 'loss': 'deviance', 'max_depth': 4, 'min_samples_leaf': 5}
+
     GB_predict = clf.predict(X_test)
 
     # print clf.feature_importances_
 
-    return GB_predict
+    return GB_predict, clf
 
-def LightGBM(X_train, y_train, X_test):
-    train_data = lgb.Dataset(X_train, label=y_train)
+def Voting(X_train, y_train, clf1, clf2, clf3, clf4, X_test):
+    # Voting Classifier
+    vc = VotingClassifier(estimators=[('svc', clf1.best_estimator_), ('rf', clf2.best_estimator_),
+                ('xgb', clf3.best_estimator_), ('gb', clf4.best_estimator_)], voting='hard', n_jobs=-1)
 
-    params = {
-         'objective': 'binary',
-         'random_state': 0,
-         'boost_from_average':False,
-         'num_threads': 4,
-         }
+    vc.fit(X_train, y_train)
 
-    lgb_model = lgb.train(params, train_data)
+    VC_predict = vc.predict(X_test)
 
-    LGB_predict = lgb_model.predict(X_test, num_iteration=lgb_model.best_iteration)
-
-    return LGB_predict
+    return VC_predict
 
 def main():
     train_path = "Data/titanic/train.csv"
@@ -299,20 +332,20 @@ def main():
 
     # X_train_scaled, X_test_scaled = DataScaling(X_train, X_test)
 
-    # SVC_predict = SupportVectorMachine(X_train, y_train, X_test)
+    SVC_predict, clf1 = SupportVectorMachine(X_train, y_train, X_test)
 
-    # RF_predict = RandomForest(X_train, y_train, X_test)
+    RF_predict, clf2 = RandomForest(X_train, y_train, X_test)
 
-    XGB_predict = XGBoost(X_train, y_train, X_test)
+    XGB_predict, clf3 = XGBoost(X_train, y_train, X_test)
 
     # DT_predict = DecisionTree(X_train, y_train, X_test)
 
-    # GB_predict = GradientBoosting(X_train, y_train, X_test)
+    GB_predict, clf4 = GradientBoosting(X_train, y_train, X_test)
 
-    # LGB_predict = LightGBM(X_train, y_train, X_test)
+    VC_predict = Voting(X_train, y_train, clf1, clf2, clf3, clf4, X_test)
 
-    submission = pd.DataFrame({"PassengerId": test_feature['PassengerId'], "Survived": XGB_predict})
-    submission.to_csv('Results/submission_xgb4.csv', index=False)
+    submission = pd.DataFrame({"PassengerId": test_feature['PassengerId'], "Survived": VC_predict})
+    submission.to_csv('Results/submission_ensemble.csv', index=False)
 
 if __name__ == '__main__':
     main()
