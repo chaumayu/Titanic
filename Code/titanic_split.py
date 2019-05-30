@@ -201,16 +201,21 @@ def FeatureLabel(train):
 #     return X_train, X_test
 
 def SupportVectorMachine(X_train, y_train, X_valid, y_valid):
-    parameters = {  'kernel':('linear', 'rbf', 'poly'),
-                    'C':[0.005, 0.01, 0.025, 0.05, 0.1, 1, 5],
-                    'gamma':[0.001, 0.01, 0.1],
-                    'degree':[3]}
-    svc = SVC(random_state=0)
-    clf = GridSearchCV(svc, parameters, cv=5, n_jobs=-1)
-    clf.fit(X_train, y_train)
-    print clf.best_params_
-    # {'kernel': 'linear', 'C': 1, 'gamma': 0.01}
-    SVC_predict = clf.predict(X_valid)
+    # parameters = {  'kernel':('linear', 'rbf', 'poly'),
+    #                 'C':[0.005, 0.01, 0.025, 0.05, 0.1, 1, 5],
+    #                 'gamma':[0.001, 0.01, 0.1],
+    #                 'degree':[3]}
+    # svc = SVC(random_state=0)
+    # clf = GridSearchCV(svc, parameters, cv=5, n_jobs=-1)
+    # clf.fit(X_train, y_train)
+    # print clf.best_params_
+    # # {'kernel': 'linear', 'C': 1, 'gamma': 0.01}
+    # SVC_predict = clf.predict(X_valid)
+
+    svc = SVC(kernel='linear',C=1,gamma=0.01,random_state=0)
+    svc.fit(X_train, y_train)
+    SVC_predict = svc.predict(X_valid)
+
     acc_score = metrics.accuracy_score(SVC_predict,y_valid)
     print 'Accuracy Score for SVM:-', acc_score
     # 0.8271186440677966
@@ -326,7 +331,7 @@ def main():
     X_train, X_valid, y_train, y_valid = train_test_split(X_train, y_train,
                                                             test_size=0.33, random_state=0)
 
-    # SVC_predict = SupportVectorMachine(X_train, y_train, X_valid, y_valid)
+    SVC_predict = SupportVectorMachine(X_train, y_train, X_valid, y_valid)
 
     # RF_predict = RandomForest(X_train, y_train, X_valid, y_valid)
 
@@ -334,7 +339,7 @@ def main():
 
     # DT_predict = DecisionTree(X_train, y_train, X_test)
 
-    GB_predict = GradientBoosting(X_train, y_train, X_valid, y_valid)
+    # GB_predict = GradientBoosting(X_train, y_train, X_valid, y_valid)
 
     # submission = pd.DataFrame({"PassengerId": test_feature['PassengerId'], "Survived": XGB_predict})
     # submission.to_csv('Results/submission_xgb3.csv', index=False)
